@@ -15,6 +15,11 @@ def create_dataset(opt, root, transforms=None, mode="train", test_name='Rain100H
         return ship_ImageDataset(opt, root=root, transforms=transforms, mode=mode)
     elif opt.dataset_name == 'rain800':
         return rain800_ImageDataset(opt, root=root, transforms=transforms, mode=mode)
+
+    elif opt.dataset_name == 'Lv2000U':
+        return Lv2000U_ImageDataset(opt, root=root, transforms=transforms, mode=mode)
+    
+
     elif opt.dataset_name == 'rain1200':
         return DID_ImageDataset(opt, root=root, transforms=transforms, mode=mode)
     elif opt.dataset_name == 'rain1400':
@@ -38,6 +43,40 @@ def to_rgb(image):
     rgb_image = Image.new("RGB", image.size)
     rgb_image.paste(image)
     return rgb_image
+
+class Lv2000U_ImageDataset(Dataset):
+    def __init__(self, opt, root, transforms=None, mode="train"):
+        self.transform = transforms
+        self.size = opt.img_height
+        self.mode = mode
+        self.root = os.path.join(root, 'Lv2000U')
+        if mode == 'train':
+            with open(os.path.join(self.root, 'train.txt'), 'r') as f:
+                self.img_path = [os.path.join(self.root, 'training', line.strip())
+                                 for line in f.readlines() if len(line.strip()) > 0]
+        else:
+            with open(os.path.join(self.root, 'test.txt'), 'r') as f:
+                self.img_path = [os.path.join(self.root, 'Lv2000U_test', line.strip())
+                                 for line in f.readlines() if len(line.strip()) > 0]
+
+    def __getitem__(self, index):
+        img = Image.open(self.img_path[index])
+        w, h = img.size
+        # Convert grayscale images to rgb
+        if img.mode != "RGB":
+            img = to_rgb(img)
+
+        clear_img = img.crop((0, 0, w / 2, h))
+        rain_img = img.crop((w / 2, 0, w, h))
+
+        if self.mode == 'train':
+            item_rain, item_clear = train_tran(inp_img=rain_img, tar_img=clear_img, ps=self.size)
+        else:
+            item_rain, item_clear = val_tran(inp_img=rain_img, tar_img=clear_img, ps=self.size)
+        return {"rain": item_rain, "clear": item_clear}
+
+    def __len__(self):
+        return len(self.img_path)
 
 
 class ship_ImageDataset(Dataset):
